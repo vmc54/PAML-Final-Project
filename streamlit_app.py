@@ -4,6 +4,8 @@ import pytesseract
 from PIL import Image
 import time
 
+st.set_page_config(page_title="SafeScan", layout="centered")
+
 @st.cache_data
 def load_safety_data():
     df = pd.read_csv("cosmetics.csv")
@@ -32,8 +34,6 @@ def calculate_safety_score(ingredients, safety_data):
         risk_text = risk.split(" ")[-1]
         score += risk_mapping.get(risk_text, 1)
     return round((score / (2 * len(ingredients))) * 10, 1)
-
-st.set_page_config(page_title="SafeScan", layout="centered")
 
 st.title("SAFESCAN : PRODUCT SAFETY SCANNER")
 
