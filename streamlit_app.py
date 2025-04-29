@@ -62,7 +62,7 @@ if st.session_state.step == "home":
     1. **Upload a photo** of the product’s ingredient label.
     2. **OCR extracts** the text.
     3. **Ingredients are checked** against a safety database.
-    4. **A score is calculated**, and flagged ingredients are explained.
+    4. **A score is calculated**, and ingredients are flagged based on their safety level.
     """)
     if st.button("Upload an Image"):
         st.session_state.step = "upload"
