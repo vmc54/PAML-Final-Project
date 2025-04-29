@@ -3,36 +3,45 @@ import pandas as pd
 import pytesseract
 from PIL import Image
 import time
+import re
+
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 st.set_page_config(page_title="SafeScan", layout="centered")
 
 @st.cache_data
 def load_safety_data():
-    df = pd.read_csv("cosmetics.csv")
+    df = pd.read_csv("Real_Ingredient_Safety_List.csv")
     return df
 
 safety_data = load_safety_data()
 
-def real_ocr(image_file):
-    image = Image.open(image_file)
+def clean_ingredient_name(name):
+    return re.sub(r'[^a-zA-Z0-9 ]', '', name).lower().strip()
+
+def real_ocr(uploaded_file):
+    image = Image.open(uploaded_file).convert('RGB')
     text = pytesseract.image_to_string(image)
-    ingredients = [i.strip() for i in text.split(",") if i.strip()]
+    ingredients_raw = re.split(r'[,\n]', text)
+    ingredients = [clean_ingredient_name(i) for i in ingredients_raw if i.strip()]
     return ingredients
 
 def get_safety_info(ingredient, safety_data):
-    match = safety_data[safety_data["Ingredient"].str.lower() == ingredient.lower()]
+    cleaned_db = safety_data.copy()
+    cleaned_db["clean_name"] = safety_data["Ingredient"].apply(clean_ingredient_name)
+    match = cleaned_db[cleaned_db["clean_name"] == ingredient]
     if not match.empty:
-        return match.iloc[0]["Info"], match.iloc[0]["Risk"]
+        row = match.iloc[0]
+        return row["Info"], row["Risk"]
     else:
         return "No data available", "⚪ Unknown"
 
 def calculate_safety_score(ingredients, safety_data):
-    risk_mapping = {"Low": 2, "Medium": 1, "Moderate": 1, "High": 0, "Unknown": 1}
+    risk_mapping = {"🟢 Low": 2, "🟠 Moderate": 1, "🔴 High": 0, "⚪ Unknown": 1}
     score = 0
     for ing in ingredients:
         _, risk = get_safety_info(ing, safety_data)
-        risk_text = risk.split(" ")[-1]
-        score += risk_mapping.get(risk_text, 1)
+        score += risk_mapping.get(risk, 1)
     return round((score / (2 * len(ingredients))) * 10, 1)
 
 st.title("SAFESCAN : PRODUCT SAFETY SCANNER")
@@ -66,9 +75,17 @@ elif st.session_state.step == "loading":
     st.subheader("Analyzing Image...")
     with st.spinner("Running OCR and processing data..."):
         time.sleep(2)
-        ingredients = real_ocr(st.session_state.uploaded_file)
-        st.session_state.ingredients = ingredients
-        st.session_state.step = "done"
+        try:
+            ingredients = real_ocr(st.session_state.uploaded_file)
+            if not ingredients:
+                st.error("No ingredients detected. Please upload a clearer image.")
+                st.session_state.step = "home"
+            else:
+                st.session_state.ingredients = ingredients
+                st.session_state.step = "done"
+        except Exception as e:
+            st.error(f"An error occurred while processing the image: {e}")
+            st.session_state.step = "home"
 
 elif st.session_state.step == "done":
     st.subheader("Done Processing!")
