@@ -11,8 +11,7 @@ st.set_page_config(page_title="SafeScan", layout="centered")
 
 @st.cache_data
 def load_safety_data():
-    df = pd.read_csv("Real_Ingredient_Safety_List.csv")
-    return df
+    return pd.read_csv("Real_Ingredient_Safety_List.csv")
 
 safety_data = load_safety_data()
 
@@ -22,8 +21,11 @@ def clean_ingredient_name(name):
 def real_ocr(uploaded_file):
     image = Image.open(uploaded_file).convert('RGB')
     text = pytesseract.image_to_string(image)
-    ingredients_raw = re.split(r'[,\n]', text)
+    st.text("OCR Extracted Text:\n" + text)
+
+    ingredients_raw = re.split(r'[,\n;•\.]', text)
     ingredients = [clean_ingredient_name(i) for i in ingredients_raw if i.strip()]
+    st.write("Processed Ingredients:", ingredients)
     return ingredients
 
 def get_safety_info(ingredient, safety_data):
@@ -43,6 +45,8 @@ def calculate_safety_score(ingredients, safety_data):
         _, risk = get_safety_info(ing, safety_data)
         score += risk_mapping.get(risk, 1)
     return round((score / (2 * len(ingredients))) * 10, 1)
+
+# ------------------ Streamlit App Layout ------------------
 
 st.title("SAFESCAN : PRODUCT SAFETY SCANNER")
 
@@ -81,34 +85,22 @@ elif st.session_state.step == "loading":
                 st.error("No ingredients detected. Please upload a clearer image.")
                 st.session_state.step = "home"
             else:
-                st.session_state.ingredients = ingredients
-                st.session_state.step = "done"
+                st.success("✅ OCR complete. Ingredients processed.")
+                st.write("Detected ingredients:", ingredients)
+
+                score = calculate_safety_score(ingredients, safety_data)
+                st.markdown(f"### OVERALL SAFETY SCORE: **{score}/10**")
+
+                st.markdown("#### Ingredient Breakdown")
+                results = []
+                for ingredient in ingredients:
+                    info, risk = get_safety_info(ingredient, safety_data)
+                    results.append((ingredient.title(), info, risk))
+
+                for ing, info, risk in results:
+                    st.markdown(f"**🧴 {ing}** — {risk}<br><span style='color:gray'>{info}</span>", unsafe_allow_html=True)
+
+                st.button("Return to Home", on_click=lambda: st.session_state.update(step="home"))
         except Exception as e:
             st.error(f"An error occurred while processing the image: {e}")
             st.session_state.step = "home"
-
-elif st.session_state.step == "done":
-    st.subheader("Done Processing!")
-    if st.button("View Results"):
-        st.session_state.step = "results"
-
-elif st.session_state.step == "results":
-    st.subheader("SAFESCAN : PRODUCT SAFETY SCANNER")
-    
-    ingredients = st.session_state.ingredients
-    score = calculate_safety_score(ingredients, safety_data)
-    st.markdown(f"### OVERALL SAFETY SCORE: **{score}/10**")
-
-    st.markdown("#### Ingredient Breakdown")
-    results = []
-    for ingredient in ingredients:
-        info, risk = get_safety_info(ingredient, safety_data)
-        results.append((ingredient, info, risk))
-
-    st.table({
-        "Ingredients": [r[0] for r in results],
-        "Information": [r[1] for r in results],
-        "Risk Level": [r[2] for r in results],
-    })
-
-    st.button("Return to Home", on_click=lambda: st.session_state.update(step="home"))
