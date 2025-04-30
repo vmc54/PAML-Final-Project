@@ -30,21 +30,20 @@ def real_ocr(uploaded_file):
 
 def get_safety_info(ingredient, safety_data):
     cleaned_db = safety_data.copy()
-    cleaned_db["clean_name"] = safety_data["Ingredient"].apply(clean_ingredient_name)
+    cleaned_db["clean_name"] = cleaned_db["Ingredient"].astype(str).apply(clean_ingredient_name)
     match = cleaned_db[cleaned_db["clean_name"] == ingredient]
     if not match.empty:
         row = match.iloc[0]
-        return row["Info"], row["Risk"]
+        return row["Description"], row["harm_score"]
     else:
-        return "No data available", "⚪ Unknown"
+        return "No data available", 5.0
 
 def calculate_safety_score(ingredients, safety_data):
-    risk_mapping = {"🟢 Low": 2, "🟠 Moderate": 1, "🔴 High": 0, "⚪ Unknown": 1}
-    score = 0
+    total_score = 0
     for ing in ingredients:
-        _, risk = get_safety_info(ing, safety_data)
-        score += risk_mapping.get(risk, 1)
-    return round((score / (2 * len(ingredients))) * 10, 1)
+        _, harm_score = get_safety_info(ing, safety_data)
+        total_score += harm_score
+    return round(total_score / len(ingredients), 1) if ingredients else 0
 
 # ------------------ Streamlit App Layout ------------------
 
